@@ -15,3 +15,5 @@ __venv__/
 
 # Compiled files
 *.pyc
+migrations
+instance

@@ -34,16 +34,18 @@ class DiscountCoupons(db.Model):
     ValidityEndDate = db.Column(db.DATE)
 
 class Vehicles(db.Model):
-    VIN = db.Column(db.String, primary_key=True)
+    VIN = db.Column(db.Integer, primary_key=True)
     Make = db.Column(db.String)
     Model = db.Column(db.String)
     Year = db.Column(db.Integer)
     LicensePlateNumber = db.Column(db.String)
+    OdometerReading = db.Column(db.Integer)
+    Image = db.Column(db.String)
     Class = db.Column(db.String, db.ForeignKey('rental_classes.Class'))
 
 class RentalServices(db.Model):
     RentalID = db.Column(db.Integer, primary_key=True)
-    VehicleID = db.Column(db.String, db.ForeignKey('vehicles.VIN'))
+    VehicleID = db.Column(db.Integer, db.ForeignKey('vehicles.VIN'))
     CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'))
     PickupLocation = db.Column(db.String)
     DropOffLocation = db.Column(db.String)
@@ -53,6 +55,7 @@ class RentalServices(db.Model):
     EndOdometer = db.Column(db.Integer)
     DailyOdometerLimit = db.Column(db.Integer)
     UnlimitedMileageOption = db.Column(db.Boolean)
+    RentalStatus = db.Column(db.String)
 
 class Invoices(db.Model):
     InvoiceID = db.Column(db.Integer, primary_key=True)

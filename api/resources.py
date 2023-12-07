@@ -1,8 +1,10 @@
 # resources.py
+import datetime
 from flask import request, jsonify
 from flask_restx import Namespace, Resource, fields
 from sqlalchemy import text  # Import the text function
 from .apimodels import *
+from dateutil.parser import parse
 from .models import *
 from .extensions import db
 
@@ -52,18 +54,10 @@ class CustomerResource(Resource):
                                                           EmployeeID=data.get('EmployeeID'))
                     db.session.add(corporate_customer)
 
-            return {'full_name': full_name, 'email': email, 'type': type}, 201
+            return {'full_name': full_name, 'email': email, 'type': type, 'id': customer_id}, 201
 
         except Exception as e:
             api.abort(404, f"Error inserting data: {str(e)}")
-
-
-
-
-login_model = api.model('LoginModel', {'Email': fields.String, 'Password': fields.String })
-
-# Define the model for the response data
-response_model = api.model('LoginResponse', {'message': fields.String, 'name': fields.String, 'type': fields.String })
 
 @api.route('/login')
 class LoginResource(Resource):
@@ -82,7 +76,7 @@ class LoginResource(Resource):
             if user:
                 # You can generate and return a token here for authentication purposes
                 # For simplicity, let's return a success message and a placeholder token
-                return {'message': 'Login successful', 'name': user.FullName, 'type': user.Type}
+                return {'message': 'Login successful', 'name': user.FullName, 'type': user.Type, 'id': user.CustomerID}
             else:
                 # Return an error message if authentication fails
                 api.abort(401, 'Authentication failed. Email or password is incorrect.')
@@ -90,3 +84,143 @@ class LoginResource(Resource):
         except Exception as e:
             # Return an error message if an exception occurs
             api.abort(500, f'Error during login: {str(e)}')
+
+@api.route('/addclass')
+class RentalClassesResource(Resource):
+    @api.expect(rental_class_model, validate=True)
+    def post(self):
+        data = request.json
+        new_rental_class = RentalClasses(**data)
+        db.session.add(new_rental_class)
+        db.session.commit()
+
+        return {'message': 'Rental class added successfully', 'class': new_rental_class.Class}, 201
+
+@api.route('/addvehicle')
+class VehicleResource(Resource):
+    @api.expect(vehicle_model)
+    def post(self):
+
+        data = request.json
+        make = data.get('Make')
+        model= data.get('Model')
+        year= data.get('Year')
+        licensePlateNumber= data.get('LicensePlateNumber')
+        odometerReading= data.get('OdometerReading')
+        image= data.get('Image')
+        vehicleClass = data.get('Class')
+
+        with db.session.begin():
+            vehicle = Vehicles(Make=make, Model=model, Year=year, LicensePlateNumber=licensePlateNumber, OdometerReading = odometerReading,  Image = image, Class = vehicleClass )
+            db.session.add(vehicle)
+            db.session.flush()  # Flush to get the auto-generated ID
+
+        return { 'message': 'Vehicle addes successfully'}, 201
+    
+@api.route('/getallvehicles')
+class VehicleListResource(Resource):
+    @api.marshal_with(vehicle_list, as_list=True)
+    def get(self):
+        combined_result = []
+        vehicles = Vehicles.query.all()
+        rental_classes = {rental_class.Class: rental_class for rental_class in RentalClasses.query.all()}
+        for vehicle in vehicles:
+            rental_class_info = rental_classes.get(vehicle.Class)
+            if rental_class_info:
+                combined_result.append({
+                    'VIN': vehicle.VIN,
+                    'Make': vehicle.Make,
+                    'Model': vehicle.Model,
+                    'Year': vehicle.Year,
+                    'LicensePlateNumber': vehicle.LicensePlateNumber,
+                    'OdometerReading': vehicle.OdometerReading,
+                    'Image': vehicle.Image,
+                    'RentalClass': {
+                        'Class': rental_class_info.Class,
+                        'DailyRate': rental_class_info.DailyRate,
+                        'OverMileageFee': rental_class_info.OverMileageFee,
+                    },
+                })
+        return combined_result
+    
+@api.route('/vehicle/<string:vin>')
+class VehicleResource(Resource):
+    @api.marshal_with(vehicle_list)
+    def get(self, vin):
+        vehicle = Vehicles.query.filter_by(VIN=vin).first()
+        if not vehicle:
+            api.abort(404, f"Vehicle with VIN {vin} not found")
+
+        rental_class_info = RentalClasses.query.filter_by(Class=vehicle.Class).first()
+        if not rental_class_info:
+            api.abort(500, f"Rental class information not found for vehicle with VIN {vin}")
+
+        result = {
+            'VIN': vehicle.VIN,
+            'Make': vehicle.Make,
+            'Model': vehicle.Model,
+            'Year': vehicle.Year,
+            'LicensePlateNumber': vehicle.LicensePlateNumber,
+            'OdometerReading': vehicle.OdometerReading,
+            'Image': vehicle.Image,
+            'RentalClass': {
+                'Class': rental_class_info.Class,
+                'DailyRate': rental_class_info.DailyRate,
+                'OverMileageFee': rental_class_info.OverMileageFee,
+            },
+        }
+        return result
+    
+@api.route('/rental')
+class RentalServiceResource(Resource):
+    @api.expect(rental_service_detail)
+    def post(self):
+        data = request.json
+
+        # Validate the required fields
+        required_fields = ['VehicleID', 'CustomerID', 'PickupLocation', 'DropOffLocation',
+                            'PickupDate', 'DropOffDate', 'StartOdometer',
+                            'DailyOdometerLimit', 'UnlimitedMileageOption', 'RentalStatus']
+
+        for field in required_fields:
+            if field not in data:
+                api.abort(400, f"Missing required field: {field}")
+        
+        data['PickupDate'] = parse(data['PickupDate']).date()
+        data['DropOffDate'] = parse(data['DropOffDate']).date()
+
+        # Create a new rental service record
+        new_rental_service = RentalServices(**data)
+        db.session.add(new_rental_service)
+        db.session.commit()
+        rentalId = new_rental_service.RentalID
+        
+
+        return { 'message': f"Booking Successful! your rental reference number is {rentalId} "}, 201
+    
+
+@api.route('/rentals')
+class RentalListResource(Resource):
+    @api.marshal_with(rental_list, as_list=True)
+    def get(self):
+        rentals = RentalServices.query.all()
+        rentals_list = []
+        
+        for rental in rentals:
+            rental_data = {
+                'RentalID': rental.RentalID,
+                'VehicleID': rental.VehicleID,
+                'CustomerID': rental.CustomerID,
+                'PickupLocation': rental.PickupLocation,
+                'DropOffLocation': rental.DropOffLocation,
+                'PickupDate': str(rental.PickupDate),  # Convert date to string
+                'DropOffDate': str(rental.DropOffDate),  # Convert date to string
+                'StartOdometer': rental.StartOdometer,
+                'EndOdometer': rental.EndOdometer,
+                'DailyOdometerLimit': rental.DailyOdometerLimit,
+                'UnlimitedMileageOption': rental.UnlimitedMileageOption,
+                'RentalStatus': rental.RentalStatus,
+            }
+            rentals_list.append(rental_data)
+        
+        return rentals_list
