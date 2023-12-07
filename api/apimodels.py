@@ -23,6 +23,7 @@ project_model = api.model('Project', {
 customer_info_model = api.model('CustomerInfo', {
     'full_name': fields.String,
     'email': fields.String,
+    'type': fields.String
 })
 
 role_model = api.model('Role', {

@@ -52,7 +52,7 @@ class CustomerResource(Resource):
                                                           EmployeeID=data.get('EmployeeID'))
                     db.session.add(corporate_customer)
 
-            return {'full_name': full_name, 'email': email}, 201
+            return {'full_name': full_name, 'email': email, 'type': type}, 201
 
         except Exception as e:
             api.abort(404, f"Error inserting data: {str(e)}")
@@ -63,7 +63,7 @@ class CustomerResource(Resource):
 login_model = api.model('LoginModel', {'Email': fields.String, 'Password': fields.String })
 
 # Define the model for the response data
-response_model = api.model('LoginResponse', {'message': fields.String })
+response_model = api.model('LoginResponse', {'message': fields.String, 'name': fields.String, 'type': fields.String })
 
 @api.route('/login')
 class LoginResource(Resource):
@@ -82,7 +82,7 @@ class LoginResource(Resource):
             if user:
                 # You can generate and return a token here for authentication purposes
                 # For simplicity, let's return a success message and a placeholder token
-                return {'message': 'Login successful'}
+                return {'message': 'Login successful', 'name': user.FullName, 'type': user.Type}
             else:
                 # Return an error message if authentication fails
                 api.abort(401, 'Authentication failed. Email or password is incorrect.')
