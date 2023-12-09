@@ -88,3 +88,10 @@ rental_location_model = api.model('RentalLocationModel', {
     'PhoneNumber': fields.String,
     'Image': fields.String
 })
+
+invoice_model = api.model('InvoiceModel', {
+    'InvoiceID': fields.Integer,
+    'RentalID' : fields.Integer,
+    'InvoiceDate' : fields.Date,
+    'InvoiceAmount' : fields.Float
+})

@@ -126,9 +126,9 @@ class RentalClassesResource(Resource):
         db.session.commit()
 
         return {'message': 'Rental class added successfully', 'class': new_rental_class.Class}, 201
-
+    
 @api.route('/addvehicle')
-class VehicleResource(Resource):
+class AddVehicleResource(Resource):
     @api.expect(vehicle_model)
     def post(self):
 
@@ -264,13 +264,33 @@ class RentalServiceUpdateResource(Resource):
         if rental:
             rental.EndOdometer = data['EndOdometer']
             rental.RentalStatus = data['RentalStatus']
-
             db.session.commit()
+
+            self.generateInvoice(rental)
 
             return {'message': f'RentalService {rental_id} updated successfully'}, 200
         else:
             return {'message': f'RentalService {rental_id} not found'}, 404
         
+    def generateInvoice(self,rental):
+        vehicleInstance = VehicleResource()
+        vehicle_info = vehicleInstance.get(vin=rental.VehicleID)
+        daily_rate = vehicle_info['RentalClass']['DailyRate']
+        over_mileage_fee = vehicle_info['RentalClass']['OverMileageFee']
+        rental_duration = (rental.DropOffDate - rental.PickupDate).days
+        total_distance = rental.EndOdometer - rental.StartOdometer
+
+        total_amount = daily_rate*rental_duration
+
+        if(not rental.UnlimitedMileageOption):
+            max_allowed_dist = int(rental.DailyOdometerLimit)*rental_duration
+            if(total_distance > max_allowed_dist):
+                total_amount = total_amount + (total_distance - max_allowed_dist)*over_mileage_fee
+        
+
+        invoice = Invoices(RentalID = rental.RentalID, InvoiceDate = datetime.date.today() , InvoiceAmount = total_amount )
+        db.session.add(invoice)
+        db.session.commit()
 
 @api.route('/rentals')
 class RentalListResource(Resource):
@@ -323,7 +343,6 @@ class CustomerRentalListResource(Resource):
             rentals_list.append(rental_data)     
         return rentals_list
 
-
 @api.route('/addLocation')
 class RentalLocationResource(Resource):
     @api.expect(rental_location_model, validate=True)
@@ -335,7 +354,6 @@ class RentalLocationResource(Resource):
 
         return {'message': 'Rental location added successfully', 'Location': new_rental_location.FullAddress, 'id': new_rental_location.LocationID}, 201
     
-
 @api.route('/rentallocations')
 class RentalLocationsListResource(Resource):
     @api.marshal_with(rental_location_model, as_list=True)
@@ -353,3 +371,18 @@ class RentalLocationsListResource(Resource):
             locations_list.append(location_data)
         
         return locations_list, 201
+    
+@api.route('/invoice')
+class InvoiceResource(Resource):
+    @api.marshal_with(invoice_model)
+    def post(self):
+        data = request.json
+        rentalID = data.get('RentalID')
+        invoice = Invoices.query.filter_by(RentalID=rentalID).first()
+        return {
+            'InvoiceID': invoice.InvoiceID,
+            'RentalID' : invoice.RentalID,
+            'InvoiceDate' : invoice.InvoiceDate,
+            'InvoiceAmount' :invoice.InvoiceAmount
+        }, 201
+
