@@ -14,6 +14,12 @@ class Customers(db.Model):
     Phone = db.Column(db.String)
     Password = db.Column(db.String)
 
+class Admins(db.Model):
+    AdminID = db.Column(db.Integer, primary_key=True)
+    FullName = db.Column(db.String)
+    Email = db.Column(db.String)
+    Password = db.Column(db.String)
+
 class IndividualCustomers(db.Model):
     CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), primary_key=True)
     DriverLicenseNumber = db.Column(db.String)
@@ -75,3 +81,4 @@ class RentalLocations(db.Model):
     LocationID = db.Column(db.Integer, primary_key=True)
     FullAddress = db.Column(db.String)
     PhoneNumber = db.Column(db.String)
+    Image = db.Column(db.String)

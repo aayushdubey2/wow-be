@@ -3,7 +3,13 @@ from .extensions import api
 
 login_model = api.model('LoginModel', {'Email': fields.String, 'Password': fields.String })
 response_model = api.model('LoginResponse', {'message': fields.String, 'name': fields.String, 'type': fields.String, 'id': fields.Integer })
+admin_response_model = api.model('AdminLoginResponse', {'message': fields.String, 'name': fields.String  })
 
+admin_model = api.model('AdminModel', {   
+    'FullName' : fields.String,
+    'Email' : fields.String,
+    'Password' : fields.String
+})
 
 customer_info_model = api.model('CustomerInfo', {
     'full_name': fields.String,
@@ -16,6 +22,15 @@ rental_class_model = api.model('RentalClassModel', {
     'Class': fields.String(required=True),
     'DailyRate': fields.Float(required=True),
     'OverMileageFee': fields.Float(required=True)
+})
+
+rental_update_model = api.model('RentalUpdate', {
+    'EndOdometer': fields.Integer(required=True, description='New value for EndOdometer'),
+    'RentalStatus': fields.String(required=True, description='New value for RentalStatus')
+})
+
+vehicle_update_model = api.model('VehicleUpdate', {
+    'OdometerReading': fields.Integer(required=True, description='New value for Odometer'),
 })
 
 vehicle_model = api.model('VehicleClassModel', {
@@ -65,4 +80,11 @@ rental_list = api.model('RentalList', {
     'DailyOdometerLimit': fields.Integer,
     'UnlimitedMileageOption': fields.Boolean,
     'RentalStatus': fields.String,
+})
+
+rental_location_model = api.model('RentalLocationModel', {
+    'LocationID': fields.Integer,
+    'FullAddress': fields.String,
+    'PhoneNumber': fields.String,
+    'Image': fields.String
 })

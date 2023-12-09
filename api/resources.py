@@ -85,6 +85,37 @@ class LoginResource(Resource):
             # Return an error message if an exception occurs
             api.abort(500, f'Error during login: {str(e)}')
 
+@api.route('/adminlogin')
+class AdminLoginResource(Resource):
+    @api.expect(login_model)
+    @api.marshal_with(admin_response_model)
+    def post(self):
+        try:
+            # Extract data from the request
+            data = request.json
+            email = data.get('Email')
+            password = data.get('Password')
+
+            # Check if the user exists in the database
+            user = Admins.query.filter_by(Email=email, Password=password).first()
+
+            if user:
+                return {'message': 'Login successful', 'name': user.FullName}
+            else:
+                api.abort(401, 'Authentication failed. Email or password is incorrect.')
+        except Exception as e:
+            api.abort(500, f'Error during login: {str(e)}')
+
+@api.route('/addadmin')
+class AdminResource(Resource):
+    @api.expect(admin_model)
+    def post(self):
+        data = request.json
+        admin = Admins(**data)
+        db.session.add(admin)
+        db.session.commit()
+        return {'message': 'Admin added successfully'}, 201
+    
 @api.route('/addclass')
 class RentalClassesResource(Resource):
     @api.expect(rental_class_model, validate=True)
@@ -143,6 +174,20 @@ class VehicleListResource(Resource):
                 })
         return combined_result
     
+@api.route('/getallclasses')
+class RentalClassResource(Resource):
+    @api.marshal_with(rental_class_model, as_list=True)
+    def get(self):
+        combined_result = []
+        rentalClasses = RentalClasses.query.all()
+        for rentalClass in rentalClasses:
+            combined_result.append({
+            'Class': rentalClass.Class,
+            'DailyRate': rentalClass.DailyRate,
+            'OverMileageFee': rentalClass.OverMileageFee,
+            })
+        return combined_result
+    
 @api.route('/vehicle/<string:vin>')
 class VehicleResource(Resource):
     @api.marshal_with(vehicle_list)
@@ -171,6 +216,17 @@ class VehicleResource(Resource):
         }
         return result
     
+    @api.expect(vehicle_update_model)
+    def put(self, vin):
+        data = api.payload
+        vehicle = Vehicles.query.filter_by(VIN=vin).first()
+        if not vehicle:
+            api.abort(404, f"Vehicle with VIN {vin} not found")
+        else: 
+            vehicle.OdometerReading = data['OdometerReading']
+            db.session.commit()
+            return {'message': f'Vehicle {vehicle.VIN} updated successfully'}, 200
+    
 @api.route('/rental')
 class RentalServiceResource(Resource):
     @api.expect(rental_service_detail)
@@ -198,6 +254,23 @@ class RentalServiceResource(Resource):
 
         return { 'message': f"Booking Successful! your rental reference number is {rentalId} "}, 201
     
+@api.route('/rental/<int:rental_id>')
+class RentalServiceUpdateResource(Resource):
+    @api.expect(rental_update_model)
+    def put(self, rental_id):
+        data = api.payload
+        rental = RentalServices.query.get(rental_id)
+
+        if rental:
+            rental.EndOdometer = data['EndOdometer']
+            rental.RentalStatus = data['RentalStatus']
+
+            db.session.commit()
+
+            return {'message': f'RentalService {rental_id} updated successfully'}, 200
+        else:
+            return {'message': f'RentalService {rental_id} not found'}, 404
+        
 
 @api.route('/rentals')
 class RentalListResource(Resource):
@@ -224,3 +297,59 @@ class RentalListResource(Resource):
             rentals_list.append(rental_data)
         
         return rentals_list
+
+@api.route('/rentals/<int:customer_id>')
+class CustomerRentalListResource(Resource):
+    @api.marshal_with(rental_list, as_list=True)
+    def get(self, customer_id):
+        rentals = RentalServices.query.filter_by(CustomerID = customer_id).all()
+        rentals_list = []
+        
+        for rental in rentals:
+            rental_data = {
+                'RentalID': rental.RentalID,
+                'VehicleID': rental.VehicleID,
+                'CustomerID': rental.CustomerID,
+                'PickupLocation': rental.PickupLocation,
+                'DropOffLocation': rental.DropOffLocation,
+                'PickupDate': str(rental.PickupDate),  # Convert date to string
+                'DropOffDate': str(rental.DropOffDate),  # Convert date to string
+                'StartOdometer': rental.StartOdometer,
+                'EndOdometer': rental.EndOdometer,
+                'DailyOdometerLimit': rental.DailyOdometerLimit,
+                'UnlimitedMileageOption': rental.UnlimitedMileageOption,
+                'RentalStatus': rental.RentalStatus,
+            }
+            rentals_list.append(rental_data)     
+        return rentals_list
+
+
+@api.route('/addLocation')
+class RentalLocationResource(Resource):
+    @api.expect(rental_location_model, validate=True)
+    def post(self):
+        data = request.json
+        new_rental_location = RentalLocations(**data)
+        db.session.add(new_rental_location)
+        db.session.commit()
+
+        return {'message': 'Rental location added successfully', 'Location': new_rental_location.FullAddress, 'id': new_rental_location.LocationID}, 201
+    
+
+@api.route('/rentallocations')
+class RentalLocationsListResource(Resource):
+    @api.marshal_with(rental_location_model, as_list=True)
+    def get(self):
+        locations = RentalLocations.query.all()
+        locations_list = []
+        
+        for location in locations:
+            location_data = {
+                'LocationID': location.LocationID,
+                'FullAddress': location.FullAddress,
+                'PhoneNumber': location.PhoneNumber,
+                'Image': location.Image,
+            }
+            locations_list.append(location_data)
+        
+        return locations_list, 201
