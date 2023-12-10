@@ -34,7 +34,7 @@ class CorporateCustomers(db.Model):
 
 class DiscountCoupons(db.Model):
     CouponID = db.Column(db.Integer, primary_key=True)
-    DiscountType = db.Column(db.String(20))
+    CouponCode = db.Column(db.String(20))
     DiscountPercentage = db.Column(db.DECIMAL)
     ValidityStartDate = db.Column(db.DATE)
     ValidityEndDate = db.Column(db.DATE)

@@ -345,7 +345,7 @@ class CustomerRentalListResource(Resource):
 
 @api.route('/addLocation')
 class RentalLocationResource(Resource):
-    @api.expect(rental_location_model, validate=True)
+    @api.expect(rental_model, validate=True)
     def post(self):
         data = request.json
         new_rental_location = RentalLocations(**data)
@@ -385,4 +385,85 @@ class InvoiceResource(Resource):
             'InvoiceDate' : invoice.InvoiceDate,
             'InvoiceAmount' :invoice.InvoiceAmount
         }, 201
+    
+@api.route('/getpayment')
+class GetPaymentResource(Resource):
+    @api.expect(api.model('GetPaymentModel', {'InvoiceID' : fields.Integer}))
+    @api.marshal_with(payment_model)
+    def post(self):
+        data = request.json
+        invoiceID = data.get('InvoiceID')
+        print(data)
+        
+        payment = Payments.query.filter_by(InvoiceID=invoiceID).first()
+        if payment:
+            return {
+                'PaymentID' : payment.PaymentID,
+                'InvoiceID' : payment.InvoiceID,
+                'CouponID' : payment.CouponID,
+                'PaymentDate' : payment.PaymentDate,
+                'PaymentMethod' : payment.PaymentMethod,
+                'CardNumber' : payment.CardNumber
+            }, 201
+
+@api.route('/addpayment')
+class AddPaymentResource(Resource):
+    @api.expect(update_payment_model)
+    @api.marshal_with(payment_model)
+    def post(self):
+        data = request.json
+        data['PaymentDate'] = datetime.date.today()
+        print(data)
+        payment = Payments(**data)
+        db.session.add(payment)
+        db.session.commit()
+        return {
+            'PaymentID' : payment.PaymentID,
+            'InvoiceID' : payment.InvoiceID,
+            'CouponID' : payment.CouponID,
+            'PaymentDate' : payment.PaymentDate,
+            'PaymentMethod' : payment.PaymentMethod,
+            'CardNumber' : payment.CardNumber
+        }, 201
+    
+
+@api.route('/addcoupon')
+class AddCouponResource(Resource):
+    @api.expect(add_coupon_model)
+    @api.marshal_with(coupon_model)
+    def post(self):
+        data = request.json
+
+        data['ValidityStartDate'] = parse(data['ValidityEndDate']).date()
+        data['ValidityEndDate'] = parse(data['ValidityEndDate']).date()
+
+        coupon = DiscountCoupons(**data)
+        db.session.add(coupon)
+        db.session.commit()
+
+        return {
+            'CouponID' : coupon.CouponID,
+            'CouponCode' : coupon.CouponCode,
+            'DiscountPercentage' : coupon.DiscountPercentage,
+            'ValidityStartDate' : coupon.ValidityStartDate,
+            'ValidityEndDate' : coupon.ValidityEndDate,
+        }, 201
+    
+
+@api.route('/getcoupon')
+class GetCouponResource(Resource):
+    @api.expect(api.model('GetCouponModel', {'CouponCode' : fields.String}))
+    @api.marshal_with(coupon_model)
+    def post(self):
+        data = request.json
+        code = data.get('CouponCode')
+        coupon = DiscountCoupons.query.filter_by(CouponCode=code).first()
+        if coupon:
+            return {
+                'CouponID' : coupon.CouponID,
+                'CouponCode' : coupon.CouponCode,
+                'DiscountPercentage' : coupon.DiscountPercentage,
+                'ValidityStartDate' : coupon.ValidityStartDate,
+                'ValidityEndDate' : coupon.ValidityEndDate,
+            }, 201
 

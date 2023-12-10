@@ -89,9 +89,47 @@ rental_location_model = api.model('RentalLocationModel', {
     'Image': fields.String
 })
 
+rental_model = api.model('RentalModel', {
+    'FullAddress': fields.String,
+    'PhoneNumber': fields.String,
+    'Image': fields.String
+})
+
 invoice_model = api.model('InvoiceModel', {
     'InvoiceID': fields.Integer,
     'RentalID' : fields.Integer,
     'InvoiceDate' : fields.Date,
     'InvoiceAmount' : fields.Float
+})
+
+payment_model = api.model('PaymentModel', {
+    'PaymentID' : fields.Integer,
+    'InvoiceID' : fields.Integer,
+    'CouponID' : fields.Integer,
+    'PaymentDate' : fields.Date,
+    'PaymentMethod' : fields.String,
+    'CardNumber' : fields.String
+})
+
+update_payment_model = api.model('UpdatePaymentModel', {
+    'InvoiceID' : fields.Integer,
+    'CouponID' : fields.Integer,
+    'PaymentMethod' : fields.String,
+    'CardNumber' : fields.String
+})
+
+
+coupon_model = api.model('CouponModel', {
+    'CouponID' : fields.Integer,
+    'CouponCode' : fields.String,
+    'DiscountPercentage' : fields.Float,
+    'ValidityStartDate' : fields.Date,
+    'ValidityEndDate' : fields.Date,
+})
+
+add_coupon_model = api.model('AddCouponModel', {
+    'CouponCode' : fields.String,
+    'DiscountPercentage' : fields.Float,
+    'ValidityStartDate' : fields.Date,
+    'ValidityEndDate' : fields.Date,
 })
