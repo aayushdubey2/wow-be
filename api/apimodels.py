@@ -133,3 +133,19 @@ add_coupon_model = api.model('AddCouponModel', {
     'ValidityStartDate' : fields.Date,
     'ValidityEndDate' : fields.Date,
 })
+
+customer_model = api.model('Customer', {
+    'CustomerID': fields.Integer,
+    'Type': fields.String,
+    'FullName': fields.String,
+    'Address': fields.String,
+    'Email': fields.String,
+    'Image': fields.String,
+    'Phone': fields.String,
+    'DriverLicenseNumber': fields.String,
+    'InsuranceCompanyName': fields.String,
+    'InsurancePolicyNumber': fields.String,
+    'CorporationName': fields.String,
+    'RegistrationNumber': fields.String,
+    'EmployeeID': fields.String,
+})

@@ -13,6 +13,7 @@ class Customers(db.Model):
     Email = db.Column(db.String(100))
     Phone = db.Column(db.String(10))
     Password = db.Column(db.String(20))
+    Image = db.Column(db.String(50))
 
 class Admins(db.Model):
     AdminID = db.Column(db.Integer, primary_key=True)

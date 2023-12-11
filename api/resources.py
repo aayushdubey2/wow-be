@@ -7,13 +7,14 @@ from .apimodels import *
 from dateutil.parser import parse
 from .models import *
 from .extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
 
 api = Namespace('api', description='API operations')
 
 @api.route('/register')
 class CustomerResource(Resource):
     @api.expect(api.model('CustomerModel', {'Type': fields.String(required=True),
-                                            'FullName': fields.String, 'Address': fields.String,
+                                            'FullName': fields.String, 'Address': fields.String, 'Image': fields.String,
                                             'Email': fields.String, 'Password': fields.String, 'Phone': fields.String,
                                             "DriverLicenseNumber": fields.String,
                                             "InsuranceCompanyName": fields.String, "InsurancePolicyNumber": fields.String,
@@ -29,12 +30,14 @@ class CustomerResource(Resource):
             address = data.get('Address')
             email = data.get('Email')
             password = data.get('Password')
+            hashed_password = generate_password_hash(password, method='sha256', salt_length=8)
             phone = data.get('Phone')
+            image = data.get('Image')
 
             # Start a transaction
             with db.session.begin():
                 # Insert into Customers table
-                customer = Customers(Type=type, FullName = full_name, Address = address, Email = email, Phone = phone, Password = password)
+                customer = Customers(Type=type, FullName = full_name, Address = address, Email = email, Phone = phone, Password = hashed_password, Image=image)
                 db.session.add(customer)
                 db.session.flush()  # Flush to get the auto-generated ID
 
@@ -71,9 +74,9 @@ class LoginResource(Resource):
             password = data.get('Password')
 
             # Check if the user exists in the database
-            user = Customers.query.filter_by(Email=email, Password=password).first()
+            user = Customers.query.filter_by(Email=email).first()
 
-            if user:
+            if user and check_password_hash(user.Password, password):
                 # You can generate and return a token here for authentication purposes
                 # For simplicity, let's return a success message and a placeholder token
                 return {'message': 'Login successful', 'name': user.FullName, 'type': user.Type, 'id': user.CustomerID}
@@ -97,9 +100,9 @@ class AdminLoginResource(Resource):
             password = data.get('Password')
 
             # Check if the user exists in the database
-            user = Admins.query.filter_by(Email=email, Password=password).first()
+            user = Admins.query.filter_by(Email=email).first()
 
-            if user:
+            if user and check_password_hash(user.Password, password):
                 return {'message': 'Login successful', 'name': user.FullName}
             else:
                 api.abort(401, 'Authentication failed. Email or password is incorrect.')
@@ -111,6 +114,9 @@ class AdminResource(Resource):
     @api.expect(admin_model)
     def post(self):
         data = request.json
+        password = data.get('Password')
+        hashed_password = generate_password_hash(password, method='sha256', salt_length=8)
+        data['Password'] = hashed_password
         admin = Admins(**data)
         db.session.add(admin)
         db.session.commit()
@@ -379,12 +385,13 @@ class InvoiceResource(Resource):
         data = request.json
         rentalID = data.get('RentalID')
         invoice = Invoices.query.filter_by(RentalID=rentalID).first()
-        return {
-            'InvoiceID': invoice.InvoiceID,
-            'RentalID' : invoice.RentalID,
-            'InvoiceDate' : invoice.InvoiceDate,
-            'InvoiceAmount' :invoice.InvoiceAmount
-        }, 201
+        if invoice:
+            return {
+                'InvoiceID': invoice.InvoiceID,
+                'RentalID' : invoice.RentalID,
+                'InvoiceDate' : invoice.InvoiceDate,
+                'InvoiceAmount' :invoice.InvoiceAmount
+            }, 201
     
 @api.route('/getpayment')
 class GetPaymentResource(Resource):
@@ -417,16 +424,16 @@ class AddPaymentResource(Resource):
         payment = Payments(**data)
         db.session.add(payment)
         db.session.commit()
-        return {
-            'PaymentID' : payment.PaymentID,
-            'InvoiceID' : payment.InvoiceID,
-            'CouponID' : payment.CouponID,
-            'PaymentDate' : payment.PaymentDate,
-            'PaymentMethod' : payment.PaymentMethod,
-            'CardNumber' : payment.CardNumber
-        }, 201
+        if payment:
+            return {
+                'PaymentID' : payment.PaymentID,
+                'InvoiceID' : payment.InvoiceID,
+                'CouponID' : payment.CouponID,
+                'PaymentDate' : payment.PaymentDate,
+                'PaymentMethod' : payment.PaymentMethod,
+                'CardNumber' : payment.CardNumber
+            }, 201
     
-
 @api.route('/addcoupon')
 class AddCouponResource(Resource):
     @api.expect(add_coupon_model)
@@ -448,16 +455,19 @@ class AddCouponResource(Resource):
             'ValidityStartDate' : coupon.ValidityStartDate,
             'ValidityEndDate' : coupon.ValidityEndDate,
         }, 201
-    
-
+     
 @api.route('/getcoupon')
 class GetCouponResource(Resource):
-    @api.expect(api.model('GetCouponModel', {'CouponCode' : fields.String}))
+    @api.expect(api.model('GetCouponModel', {'CouponCode' : fields.String, 'CouponID': fields.Integer}))
     @api.marshal_with(coupon_model)
     def post(self):
         data = request.json
         code = data.get('CouponCode')
-        coupon = DiscountCoupons.query.filter_by(CouponCode=code).first()
+        id = data.get('CouponID')
+        if id:
+            coupon = DiscountCoupons.query.filter_by(CouponID=id).first()
+        else:
+            coupon = DiscountCoupons.query.filter_by(CouponCode=code).first()
         if coupon:
             return {
                 'CouponID' : coupon.CouponID,
@@ -467,3 +477,30 @@ class GetCouponResource(Resource):
                 'ValidityEndDate' : coupon.ValidityEndDate,
             }, 201
 
+
+
+# Resource to get customer information by CustomerID
+@api.route('/<int:customer_id>')
+class CustomerInfoResource(Resource):
+    @api.marshal_with(customer_model)
+    def get(self, customer_id):
+        customer = Customers.query.get(customer_id)
+
+        if not customer:
+            return {'message': 'Customer not found'}, 404
+
+        customer_data = customer.__dict__
+
+        # Check customer type and add additional information
+        if customer_data['Type'] == 'individual':
+            additional_info = IndividualCustomers.query.get(customer_id).__dict__
+        elif customer_data['Type'] == 'corporate':
+            additional_info = CorporateCustomers.query.get(customer_id).__dict__
+        else:
+            additional_info = {}
+
+        # Combine customer and additional information
+        customer_data.update(additional_info)
+        del customer_data['Password']
+
+        return customer_data, 201
