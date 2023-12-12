@@ -232,6 +232,18 @@ class VehicleResource(Resource):
             vehicle.OdometerReading = data['OdometerReading']
             db.session.commit()
             return {'message': f'Vehicle {vehicle.VIN} updated successfully'}, 200
+        
+    def delete(self, vin):
+        vehicle = Vehicles.query.get(vin)
+        if vehicle:
+            related_objects = RentalServices.query.filter_by(VehicleID=vin).all()
+            if related_objects:
+                return {'message': 'Cannot delete vehicle, related objects exist'}, 400
+            db.session.delete(vehicle)
+            db.session.commit()
+            return {'message': 'Vehicle deleted successfully'}, 201
+        else:
+            return {'message': 'Vehicle not found'}, 404
     
 @api.route('/rental')
 class RentalServiceResource(Resource):
@@ -288,11 +300,12 @@ class RentalServiceUpdateResource(Resource):
 
         total_amount = daily_rate*rental_duration
 
-        if(not rental.UnlimitedMileageOption):
+        if(rental.UnlimitedMileageOption):
+            total_amount = total_amount*1.5
+        else:
             max_allowed_dist = int(rental.DailyOdometerLimit)*rental_duration
             if(total_distance > max_allowed_dist):
                 total_amount = total_amount + (total_distance - max_allowed_dist)*over_mileage_fee
-        
 
         invoice = Invoices(RentalID = rental.RentalID, InvoiceDate = datetime.date.today() , InvoiceAmount = total_amount )
         db.session.add(invoice)
